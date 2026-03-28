@@ -1,0 +1,11 @@
+{
+  "AI": {"faculty": "F1", "type": "Theory", "required": 2},
+  "ML": {"faculty": "F2", "type": "Theory", "required": 2},
+  "FLAT": {"faculty": "F3", "type": "Theory", "required": 2},
+  "PE3": {"faculty": "F4", "type": "Theory", "required": 2},
+  "OE": {"faculty": "F5", "type": "Theory", "required": 2},
+
+  "AI Lab": {"faculty": "F1", "type": "Lab", "required": 1},
+  "ML Lab": {"faculty": "F2", "type": "Lab", "required": 1},
+  "PE3 Lab": {"faculty": "F4", "type": "Lab", "required": 1}
+}
