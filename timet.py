@@ -30,9 +30,12 @@ def next_slot(slot):
 # BUILD STRUCTURES
 # -------------------------------
 # --- UPDATE THIS BLOCK ---
+subjects = {}
+required = {}
 for cls, subs in classes.items():
     subjects[cls] = {}
     required[cls] = {}
+    
 
     for sub, details in subs.items():
         # Added details.get("experience", 0) to the tuple
