@@ -53,6 +53,7 @@ random.shuffle(variables)
 # -------------------------------
 def count_sub(assignment, cls, sub):
     count = sum(1 for (c, _, _), v in assignment.items() if c == cls and v[0] == sub)
+    # Since 1 Lab session = 2 slots, we divide by 2 to match the "required: 1" in JSON
     if "Lab" in sub:
         return count // 2
     return count
@@ -63,25 +64,25 @@ def count_sub(assignment, cls, sub):
 def preassign_labs():
     assignment = {}
     
-    # Shuffle classes and days so the first class doesn't always get the first day
     shuffled_classes = list(classes.keys())
     random.shuffle(shuffled_classes)
     
-    shuffled_days = list(days)
-    random.shuffle(shuffled_days)
-
     for cls in shuffled_classes:
+        # Get all lab subjects for this class
         lab_subjects = [s for s in required[cls] if "Lab" in s]
-        random.shuffle(lab_subjects) # Randomize lab order per class
+        random.shuffle(lab_subjects)
 
         for sub in lab_subjects:
             placed = False
+            shuffled_days = list(days)
+            random.shuffle(shuffled_days)
+
             for day in shuffled_days:
-                # Check if this class already has a lab this day
+                # RULE: Only 1 lab per day per class
                 if any(v[0] == cls and "Lab" in assignment[v][0] for v in assignment if v[1] == day):
                     continue
 
-                # Shuffle starting slots (10:00 or 02:00)
+                # RULE: Labs must start at 10:00 or 02:00 to take 2 continuous slots
                 starts = ["10:00-11:30", "02:00-03:30"]
                 random.shuffle(starts)
 
@@ -90,12 +91,11 @@ def preassign_labs():
                     v1 = (cls, day, start)
                     v2 = (cls, day, nxt)
 
+                    # Ensure slots aren't already taken by another class's lab
                     if v1 in assignment or v2 in assignment:
                         continue
 
                     fac = subjects[cls][sub][0]
-                    
-                    # Shuffle rooms so Lab1 isn't always picked first
                     room_list = list(rooms.items())
                     random.shuffle(room_list)
 
@@ -103,7 +103,7 @@ def preassign_labs():
                         if typ != "Lab":
                             continue
                         
-                        # Faculty/Room clash check for labs
+                        # Check if Faculty or Room is busy in EITHER of the two slots
                         clash = False
                         for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
                             if d2 == day and (s2 == start or s2 == nxt):
@@ -112,6 +112,7 @@ def preassign_labs():
                                     break
                         
                         if not clash:
+                            # Assign both slots simultaneously
                             assignment[v1] = (sub, fac, room)
                             assignment[v2] = (sub, fac, room)
                             placed = True
@@ -128,36 +129,37 @@ def is_consistent(var, value, assignment):
     sub, fac, room = value
     typ = subjects[cls][sub][1]
 
-    # 1. Subject Quantity Rule: Don't assign more than the required count per class
-    # Note: Lab sessions are pre-assigned, but this keeps the solver from adding 
-    # extra theory or "accidental" lab slots during backtracking.
+    # 1. Prevent Theory from overwriting pre-assigned Labs
+    if var in assignment:
+        return False
+
+    # 2. Subject Quantity Rule
     if sub in required[cls] and count_sub(assignment, cls, sub) >= required[cls][sub]:
         return False
 
-    # 2. Global Resource Clash Rule: Cross-Class Faculty and Room check
-    # Ensures a teacher isn't in two places at once, and a room isn't double-booked.
+    # 3. Global Resource Clash (Faculty/Room)
     for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
         if d2 == day and s2 == slot:
-            # Check if another class is using the same faculty or room at this time
             if fac2 == fac and fac != "None":
                 return False
             if room2 == room:
                 return False
 
-    # 3. Daily Variety Rule: Theory subjects cannot repeat in the same day for a class
+    # 4. Daily Variety: No same theory twice a day for a class
     if typ == "Theory" and sub != "FREE":
         for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
             if c2 == cls and d2 == day and sub2 == sub:
                 return False
 
-    # 4. Soft Constraint "Hardened": FREE slot rules
-    if sub == "FREE":
-        # Rule A: Position - Only allow FREE in the afternoon (Slots 2 & 3)
-        idx = time_slots.index(slot)
-        if idx not in (2, 3):
+    # 5. Lab Rule: Ensure no second lab is added to the same day
+    if "Lab" in sub:
+        if any("Lab" in v[0] for (c, d, s), v in assignment.items() if c == cls and d == day):
             return False
-        
-        # Rule B: Quantity - Limit total FREE slots to 5 per class (from your JSON update)
+
+    # Updated FREE slot logic inside is_consistent:
+    if sub == "FREE":
+    # Limit total FREE slots to 5, but allow them anywhere 
+    # OR keep them in the afternoon only if labs aren't there.
         free_count = sum(1 for (c, d, s), v in assignment.items() 
                          if c == cls and v[0] == "FREE")
         if free_count >= 5:
