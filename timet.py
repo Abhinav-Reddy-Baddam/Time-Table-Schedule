@@ -1,5 +1,6 @@
 import json
 import random
+import statistics
 
 # -------------------------------
 # LOAD DATA
@@ -14,14 +15,12 @@ rooms = data["rooms"]
 # SETUP
 # -------------------------------
 days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
-time_slots = [
-    "10:00-11:30",
-    "11:30-01:00",
-    "02:00-03:30",
-    "03:30-05:00"
-]
+time_slots = ["10:00-11:30", "11:30-01:00", "02:00-03:30", "03:30-05:00"]
 morning_slots = ["10:00-11:30", "11:30-01:00"]
-SENIOR_THRESHOLD = 10  # Experience years to be considered "Senior"
+
+# Dynamic Seniority Threshold
+all_exp = [d.get("experience", 0) for c in classes.values() for d in c.values()]
+SENIOR_THRESHOLD = statistics.median(all_exp) if all_exp else 0
 
 def next_slot(slot):
     i = time_slots.index(slot)
@@ -33,252 +32,160 @@ def next_slot(slot):
 subjects = {}
 required = {}
 for cls, subs in classes.items():
-    subjects[cls] = {}
-    required[cls] = {}
-    for sub, details in subs.items():
-        # Store (faculty, type, experience)
-        subjects[cls][sub] = (details["faculty"], details["type"], details.get("experience", 0))
-        required[cls][sub] = details["required"]
+    subjects[cls] = {s: (d["faculty"], d["type"], d.get("experience", 0)) for s, d in subs.items()}
     subjects[cls]["FREE"] = ("None", "Theory", 0)
+    required[cls] = {s: d["required"] for s, d in subs.items()}
 
-# -------------------------------
-# VARIABLES
-# -------------------------------
+# SPEED FIX: Sort variables so morning slots are processed early
 variables = [(cls, d, t) for cls in classes for d in days for t in time_slots]
-random.shuffle(variables)
+variables.sort(key=lambda x: x[2] not in morning_slots) # Process morning slots first
 
 # -------------------------------
-# COUNT
+# OPTIMIZED LOGIC
 # -------------------------------
 def count_sub(assignment, cls, sub):
     count = sum(1 for (c, _, _), v in assignment.items() if c == cls and v[0] == sub)
-    if "Lab" in sub:
-        return count // 2
-    return count
+    return count // 2 if "Lab" in sub else count
 
-# -------------------------------
-# PREASSIGN LABS (Strict Senior Morning Rule)
-# -------------------------------
-def preassign_labs():
-    assignment = {}
-    shuffled_classes = list(classes.keys())
-    random.shuffle(shuffled_classes)
-    
-    for cls in shuffled_classes:
-        lab_subjects = [s for s in required[cls] if "Lab" in s]
-        random.shuffle(lab_subjects)
-
-        for sub in lab_subjects:
-            placed = False
-            shuffled_days = list(days)
-            random.shuffle(shuffled_days)
-
-            for day in shuffled_days:
-                if any(v[0] == cls and "Lab" in assignment[v][0] for v in assignment if v[1] == day):
-                    continue
-
-                fac, _, exp = subjects[cls][sub]
-                
-                # STRICT RULE: Senior Labs ONLY in morning, Junior Labs ONLY in afternoon
-                if exp >= SENIOR_THRESHOLD:
-                    starts = ["10:00-11:30"]
-                else:
-                    starts = ["02:00-03:30"]
-
-                for start in starts:
-                    nxt = next_slot(start)
-                    v1, v2 = (cls, day, start), (cls, day, nxt)
-
-                    if v1 in assignment or v2 in assignment:
-                        continue
-
-                    room_list = list(rooms.items())
-                    random.shuffle(room_list)
-
-                    for room, typ in room_list:
-                        if typ != "Lab":
-                            continue
-                        
-                        clash = False
-                        for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
-                            if d2 == day and (s2 == start or s2 == nxt):
-                                if fac2 == fac or room2 == room:
-                                    clash = True
-                                    break
-                        
-                        if not clash:
-                            assignment[v1] = (sub, fac, room)
-                            assignment[v2] = (sub, fac, room)
-                            placed = True
-                            break
-                    if placed: break
-                if placed: break
-    return assignment
-
-# -------------------------------
-# CONSISTENCY (Strict Senior morning Rule)
-# -------------------------------
 def is_consistent(var, value, assignment):
     cls, day, slot = var
     sub, fac, room = value
-    typ = subjects[cls][sub][1]
-    exp = subjects[cls][sub][2]
+    _, typ, exp = subjects[cls][sub]
 
-    if var in assignment: return False
-    
-    # --- STRICT SENIORITY CONSTRAINT ---
-    if exp >= SENIOR_THRESHOLD and sub != "FREE":
-        if slot not in morning_slots:
-            return False # Stop senior faculty from being in the afternoon
+    # Seniority Hard Rule
+    if exp >= SENIOR_THRESHOLD and sub != "FREE" and slot not in morning_slots:
+        return False
 
     if sub in required[cls] and count_sub(assignment, cls, sub) >= required[cls][sub]:
         return False
 
+    # Clash Detection
     for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
         if d2 == day and s2 == slot:
-            if fac2 == fac and fac != "None": return False
-            if room2 == room: return False
-
-    if typ == "Theory" and sub != "FREE":
-        for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
-            if c2 == cls and d2 == day and sub2 == sub:
+            if (fac2 == fac and fac != "None") or room2 == room:
                 return False
 
-    if "Lab" in sub:
-        if any("Lab" in v[0] for (c, d, s), v in assignment.items() if c == cls and d == day):
+    if typ == "Theory" and sub != "FREE":
+        if any(c2 == cls and d2 == day and sub2 == sub for (c2, d2, s2), (sub2, fac2, room2) in assignment.items()):
             return False
 
-    if sub == "FREE":
-        free_count = sum(1 for (c, d, s), v in assignment.items() if c == cls and v[0] == "FREE")
-        if free_count >= 5: return False
+    if "Lab" in sub and any("Lab" in v[0] for (c, d, s), v in assignment.items() if c == cls and d == day):
+        return False
 
     return True
 
-# -------------------------------
-# MRV
-# -------------------------------
-def select_var(assignment):
-    best = None
-    min_options = float('inf')
+def preassign_labs():
+    assignment = {}
+    cls_list = list(classes.keys())
+    random.shuffle(cls_list)
+    for cls in cls_list:
+        labs = [s for s in required[cls] if "Lab" in s]
+        for sub in labs:
+            placed = False
+            for day in sorted(days, key=lambda k: random.random()):
+                if any(v[0] == cls and "Lab" in assignment[v][0] for v in assignment if v[1] == day): continue
+                fac, _, exp = subjects[cls][sub]
+                starts = ["10:00-11:30"] if exp >= SENIOR_THRESHOLD else ["02:00-03:30"]
+                for start in starts:
+                    nxt = next_slot(start)
+                    v1, v2 = (cls, day, start), (cls, day, nxt)
+                    if v1 in assignment or v2 in assignment: continue
+                    for room, rtyp in rooms.items():
+                        if rtyp != "Lab": continue
+                        if not any(d2 == day and (s2 == start or s2 == nxt) and (f2 == fac or r2 == room) for (c2, d2, s2), (sub2, f2, r2) in assignment.items()):
+                            assignment[v1] = assignment[v2] = (sub, fac, room)
+                            placed = True; break
+                    if placed: break
+                if placed: break
+    return assignment
 
-    for v in variables:
-        if v in assignment: continue
-        cls, day, slot = v
-        options = 0
-        for sub, (fac, typ, exp) in subjects[cls].items():
-            for room, rtype in rooms.items():
-                if typ == rtype:
-                    if is_consistent(v, (sub, fac, room), assignment):
-                        options += 1
-        if options == 0: return v
-        if options < min_options:
-            min_options = options
-            best = v
-    return best
-
-# -------------------------------
-# VALUE ORDER
-# -------------------------------
 def order_values(var, assignment):
-    cls, day, slot = var
+    cls, _, slot = var
+    is_morn = slot in morning_slots
     vals = []
-    room_items = list(rooms.items())
-    random.shuffle(room_items)
-
     for sub, (fac, typ, exp) in subjects[cls].items():
-        if sub in required[cls] and count_sub(assignment, cls, sub) >= required[cls][sub]:
-            continue
-        for room, rtype in room_items:
-            if typ == rtype:
-                vals.append((sub, fac, room, exp))
-
-    def combined_score(val):
-        sub_name, _, _, exp = val
-        if sub_name == "FREE": return 1000 
-        is_morning = slot in morning_slots
-        seniority_priority = -exp if is_morning else exp 
-        
-        idx = time_slots.index(slot)
-        has_neighbor = any(0 <= n_idx < len(time_slots) and (cls, day, time_slots[n_idx]) in assignment 
-                           for n_idx in [idx - 1, idx + 1])
-        return seniority_priority + (0 if has_neighbor else 100)
-
-    vals.sort(key=combined_score)
+        if sub in required[cls] and count_sub(assignment, cls, sub) >= required[cls][sub]: continue
+        for r, rt in rooms.items():
+            if typ == rt: vals.append((sub, fac, r, exp))
+    
+    # Priority: Experienced faculty for morning, Juniors for afternoon
+    vals.sort(key=lambda v: -v[3] if is_morn else v[3])
     return [(v[0], v[1], v[2]) for v in vals]
-
-# -------------------------------
-# FORWARD CHECK & BACKTRACK
-# -------------------------------
-def forward_check(assignment):
-    remaining_slots = len(variables) - len(assignment)
-    needed = sum(max(0, required[cls][sub] - count_sub(assignment, cls, sub))
-                 for cls in required for sub in required[cls] if "Lab" not in sub)
-    return remaining_slots >= needed
 
 def backtrack(assignment):
     if len(assignment) == len(variables): return assignment
-    if not forward_check(assignment): return None
-    var = select_var(assignment)
-    if var is None: return None
+    
+    # Find next unassigned variable
+    var = next((v for v in variables if v not in assignment), None)
+    if not var: return None
+
     for val in order_values(var, assignment):
         if is_consistent(var, val, assignment):
             assignment[var] = val
-            result = backtrack(assignment)
-            if result: return result
+            res = backtrack(assignment)
+            if res: return res
             del assignment[var]
     return None
 
 # -------------------------------
-# RUN & HTML
+# EXECUTION & HTML
 # -------------------------------
-print("Solving with STRICT Senior Morning Rule...")
-
-initial = preassign_labs()
-solution = backtrack(initial)
+print("Solving Fast...")
+solution = backtrack(preassign_labs())
 
 if solution:
-    html_content = """
+    html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>College Timetable</title>
+        <title>Fast Timetable</title>
         <style>
-            body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
-            h1 { text-align: center; color: #333; }
-            .class-section { background: white; margin-bottom: 40px; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
-            th { background-color: #4CAF50; color: white; }
-            tr:nth-child(even) { background-color: #f2f2f2; }
-            .lab { background-color: #e8f5e9; font-weight: bold; color: #2e7d32; }
-            .free { color: #999; font-style: italic; }
+            body {{ font-family: sans-serif; background: #f4f7f6; padding: 20px; }}
+            .nav {{ position: sticky; top: 0; background: white; padding: 15px; display: flex; gap: 10px; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 8px; margin-bottom: 20px; }}
+            input {{ padding: 10px; width: 250px; border: 1px solid #ddd; border-radius: 4px; }}
+            button {{ padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }}
+            .class-card {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; }}
+            table {{ width: 100%; border-collapse: collapse; }}
+            th, td {{ border: 1px solid #eee; padding: 10px; text-align: center; }}
+            th {{ background: #28a745; color: white; }}
+            .highlight {{ background: #fff3cd !important; border: 2px solid #ffc107 !important; }}
+            .fade {{ opacity: 0.2; }}
+            @media print {{ .nav {{ display: none; }} }}
         </style>
     </head>
     <body>
-        <h1>University Master Timetable</h1>
+        <div class="nav">
+            <input type="text" id="q" placeholder="Search Faculty..." onkeyup="search()">
+            <button onclick="window.print()">Print</button>
+        </div>
     """
-
     for cls in classes:
-        html_content += f"<div class='class-section'><h2>Class: {cls}</h2>"
-        html_content += "<table><tr><th>Day</th>"
-        for t in time_slots:
-            html_content += f"<th>{t}</th>"
+        html_content += f"<div class='class-card'><h2>{cls}</h2><table><tr><th>Day</th>"
+        for t in time_slots: html_content += f"<th>{t}</th>"
         html_content += "</tr>"
-
         for d in days:
-            html_content += f"<tr><td><strong>{d}</strong></td>"
+            html_content += f"<tr><td>{d}</td>"
             for t in time_slots:
                 res = solution.get((cls, d, t))
-                if res:
-                    sub, fac, room = res
-                    css_class = "lab" if "Lab" in sub else ("free" if sub == "FREE" else "")
-                    html_content += f"<td class='{css_class}'>{sub}<br><small>{fac} ({room})</small></td>"
-                else:
-                    html_content += "<td>-</td>"
+                sub, fac, room = res if res else ("-", "", "")
+                html_content += f"<td data-f='{fac}'>{sub}<br><small>{fac} {room}</small></td>"
             html_content += "</tr>"
         html_content += "</table></div>"
-    html_content += "</body></html>"
 
-    with open("index.html", "w") as f:
-        f.write(html_content)
-    print("✅ Success! index.html generated with Seniority Hard Constraints.")
+    html_content += """
+    <script>
+    function search() {
+        let q = document.getElementById('q').value.toUpperCase();
+        document.querySelectorAll('td[data-f]').forEach(td => {
+            if (!q) td.classList.remove('highlight', 'fade');
+            else if (td.getAttribute('data-f').toUpperCase().includes(q)) {
+                td.classList.add('highlight'); td.classList.remove('fade');
+            } else {
+                td.classList.add('fade'); td.classList.remove('highlight');
+            }
+        });
+    }
+    </script></body></html>"""
+    
+    with open("index.html", "w") as f: f.write(html_content)
+    print("✅ Done! Check index.html")
