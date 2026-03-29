@@ -192,12 +192,28 @@ if solution:
     <script>
     function search() {
         let q = document.getElementById('q').value.trim().toUpperCase();
+        
         document.querySelectorAll('td[data-f]').forEach(td => {
-            if (!q) { td.classList.remove('highlight', 'fade'); return; }
-            if (td.getAttribute('data-f').toUpperCase() === q) {
-                td.classList.add('highlight'); td.classList.remove('fade');
+            if (!q) { 
+                td.classList.remove('highlight', 'fade'); 
+                return; 
+            }
+
+            // 1. Get Faculty name (for exact matching)
+            let facAttr = td.getAttribute('data-f').toUpperCase();
+            
+            // 2. Get Subject and Room (from the visible text)
+            let cellText = td.innerText.toUpperCase();
+
+            // MATCHING LOGIC:
+            // - Exact match for Faculty (so F1 doesn't match F10)
+            // - OR Subject/Room contains the search text
+            if (facAttr === q || (cellText.includes(q) && facAttr !== "NONE")) {
+                td.classList.add('highlight'); 
+                td.classList.remove('fade');
             } else {
-                td.classList.add('fade'); td.classList.remove('highlight');
+                td.classList.add('fade'); 
+                td.classList.remove('highlight');
             }
         });
     }
