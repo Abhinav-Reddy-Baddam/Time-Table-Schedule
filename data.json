@@ -53,6 +53,6 @@
   },
   "rooms": {
     "R1": "Theory", "R2": "Theory", "R3": "Theory", "R4": "Theory", "R5": "Theory",
-    "Lab1": "Lab", "Lab2": "Lab"
+    "Lab1": "Lab", "Lab2": "Lab","Lab3": "Lab"
   }
 }
