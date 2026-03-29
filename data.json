@@ -1,70 +1,58 @@
 {
   "classes": {
     "CSE-A": {
-      "Math": {"faculty": "F1", "type": "Theory", "required": 2},
-      "AI": {"faculty": "F2", "type": "Theory", "required": 2},
-      "OS": {"faculty": "F3", "type": "Theory", "required": 2},
-      "DBMS": {"faculty": "F4", "type": "Theory", "required": 2},
-      "CN": {"faculty": "F10", "type": "Theory", "required": 2},
-      "AI Lab": {"faculty": "F2", "type": "Lab", "required": 1},
-      "OS Lab": {"faculty": "F3", "type": "Lab", "required": 1},
-      "DBMS Lab": {"faculty": "F4", "type": "Lab", "required": 1}
+      "Math": {"faculty": "F1", "type": "Theory", "required": 2, "experience": 15},
+      "AI": {"faculty": "F2", "type": "Theory", "required": 2, "experience": 12},
+      "OS": {"faculty": "F3", "type": "Theory", "required": 2, "experience": 10},
+      "DBMS": {"faculty": "F4", "type": "Theory", "required": 2, "experience": 8},
+      "CN": {"faculty": "F10", "type": "Theory", "required": 2, "experience": 1},
+      "AI Lab": {"faculty": "F2", "type": "Lab", "required": 1, "experience": 12},
+      "OS Lab": {"faculty": "F3", "type": "Lab", "required": 1, "experience": 10},
+      "DBMS Lab": {"faculty": "F4", "type": "Lab", "required": 1, "experience": 8}
     },
-
     "CSE-B": {
-      "Math": {"faculty": "F6", "type": "Theory", "required": 2},
-      "AI": {"faculty": "F7", "type": "Theory", "required": 2},
-      "OS": {"faculty": "F8", "type": "Theory", "required": 2},
-      "DBMS": {"faculty": "F4", "type": "Theory", "required": 2},
-      "CN": {"faculty": "F5", "type": "Theory", "required": 2},
-      "AI Lab": {"faculty": "F7", "type": "Lab", "required": 1},
-      "OS Lab": {"faculty": "F8", "type": "Lab", "required": 1},
-      "DBMS Lab": {"faculty": "F4", "type": "Lab", "required": 1}
+      "Math": {"faculty": "F6", "type": "Theory", "required": 2, "experience": 5},
+      "AI": {"faculty": "F7", "type": "Theory", "required": 2, "experience": 4},
+      "OS": {"faculty": "F8", "type": "Theory", "required": 2, "experience": 3},
+      "DBMS": {"faculty": "F4", "type": "Theory", "required": 2, "experience": 8},
+      "CN": {"faculty": "F5", "type": "Theory", "required": 2, "experience": 7},
+      "AI Lab": {"faculty": "F7", "type": "Lab", "required": 1, "experience": 4},
+      "OS Lab": {"faculty": "F8", "type": "Lab", "required": 1, "experience": 3},
+      "DBMS Lab": {"faculty": "F4", "type": "Lab", "required": 1, "experience": 8}
     },
-
     "CSE-C": {
-      "Math": {"faculty": "F1", "type": "Theory", "required": 2},
-      "AI": {"faculty": "F7", "type": "Theory", "required": 2},
-      "OS": {"faculty": "F8", "type": "Theory", "required": 2},
-      "DBMS": {"faculty": "F9", "type": "Theory", "required": 2},
-      "CN": {"faculty": "F5", "type": "Theory", "required": 2},
-      "AI Lab": {"faculty": "F7", "type": "Lab", "required": 1},
-      "OS Lab": {"faculty": "F8", "type": "Lab", "required": 1},
-      "DBMS Lab": {"faculty": "F9", "type": "Lab", "required": 1}
+      "Math": {"faculty": "F1", "type": "Theory", "required": 2, "experience": 15},
+      "AI": {"faculty": "F7", "type": "Theory", "required": 2, "experience": 4},
+      "OS": {"faculty": "F8", "type": "Theory", "required": 2, "experience": 3},
+      "DBMS": {"faculty": "F9", "type": "Theory", "required": 2, "experience": 2},
+      "CN": {"faculty": "F5", "type": "Theory", "required": 2, "experience": 7},
+      "AI Lab": {"faculty": "F7", "type": "Lab", "required": 1, "experience": 4},
+      "OS Lab": {"faculty": "F8", "type": "Lab", "required": 1, "experience": 3},
+      "DBMS Lab": {"faculty": "F9", "type": "Lab", "required": 1, "experience": 2}
     },
-
     "CSE-D": {
-      "Math": {"faculty": "F1", "type": "Theory", "required": 2},
-      "AI": {"faculty": "F7", "type": "Theory", "required": 2},
-      "OS": {"faculty": "F8", "type": "Theory", "required": 2},
-      "DBMS": {"faculty": "F9", "type": "Theory", "required": 2},
-      "CN": {"faculty": "F5", "type": "Theory", "required": 2},
-      "AI Lab": {"faculty": "F7", "type": "Lab", "required": 1},
-      "OS Lab": {"faculty": "F8", "type": "Lab", "required": 1},
-      "DBMS Lab": {"faculty": "F9", "type": "Lab", "required": 1}
+      "Math": {"faculty": "F1", "type": "Theory", "required": 2, "experience": 15},
+      "AI": {"faculty": "F7", "type": "Theory", "required": 2, "experience": 4},
+      "OS": {"faculty": "F8", "type": "Theory", "required": 2, "experience": 3},
+      "DBMS": {"faculty": "F9", "type": "Theory", "required": 2, "experience": 2},
+      "CN": {"faculty": "F5", "type": "Theory", "required": 2, "experience": 7},
+      "AI Lab": {"faculty": "F7", "type": "Lab", "required": 1, "experience": 4},
+      "OS Lab": {"faculty": "F8", "type": "Lab", "required": 1, "experience": 3},
+      "DBMS Lab": {"faculty": "F9", "type": "Lab", "required": 1, "experience": 2}
     },
-
     "CSE-E": {
-      "Math": {"faculty": "F6", "type": "Theory", "required": 2},
-      "AI": {"faculty": "F2", "type": "Theory", "required": 2},
-      "OS": {"faculty": "F3", "type": "Theory", "required": 2},
-      "DBMS": {"faculty": "F9", "type": "Theory", "required": 2},
-      "CN": {"faculty": "F10", "type": "Theory", "required": 2},
-      "AI Lab": {"faculty": "F2", "type": "Lab", "required": 1},
-      "OS Lab": {"faculty": "F3", "type": "Lab", "required": 1},
-      "DBMS Lab": {"faculty": "F9", "type": "Lab", "required": 1}
+      "Math": {"faculty": "F6", "type": "Theory", "required": 2, "experience": 5},
+      "AI": {"faculty": "F2", "type": "Theory", "required": 2, "experience": 12},
+      "OS": {"faculty": "F3", "type": "Theory", "required": 2, "experience": 10},
+      "DBMS": {"faculty": "F9", "type": "Theory", "required": 2, "experience": 2},
+      "CN": {"faculty": "F10", "type": "Theory", "required": 2, "experience": 1},
+      "AI Lab": {"faculty": "F2", "type": "Lab", "required": 1, "experience": 12},
+      "OS Lab": {"faculty": "F3", "type": "Lab", "required": 1, "experience": 10},
+      "DBMS Lab": {"faculty": "F9", "type": "Lab", "required": 1, "experience": 2}
     }
   },
-
   "rooms": {
-    "R1": "Theory",
-    "R2": "Theory",
-    "R3": "Theory",
-    "R4": "Theory",
-    "R5": "Theory",
-    "Lab1": "Lab",
-    "Lab2": "Lab"
-    
-   
+    "R1": "Theory", "R2": "Theory", "R3": "Theory", "R4": "Theory", "R5": "Theory",
+    "Lab1": "Lab", "Lab2": "Lab"
   }
 }
