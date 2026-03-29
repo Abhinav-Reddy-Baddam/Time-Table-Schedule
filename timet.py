@@ -14,13 +14,13 @@ rooms = data["rooms"]
 # SETUP
 # -------------------------------
 days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
-
 time_slots = [
     "10:00-11:30",
     "11:30-01:00",
     "02:00-03:30",
     "03:30-05:00"
 ]
+morning_slots = ["10:00-11:30", "11:30-01:00"]
 
 def next_slot(slot):
     i = time_slots.index(slot)
@@ -29,20 +29,16 @@ def next_slot(slot):
 # -------------------------------
 # BUILD STRUCTURES
 # -------------------------------
-# --- UPDATE THIS BLOCK ---
 subjects = {}
 required = {}
 for cls, subs in classes.items():
     subjects[cls] = {}
     required[cls] = {}
-    
-
     for sub, details in subs.items():
-        # Added details.get("experience", 0) to the tuple
+        # Store (faculty, type, experience)
         subjects[cls][sub] = (details["faculty"], details["type"], details.get("experience", 0))
         required[cls][sub] = details["required"]
-
-    subjects[cls]["FREE"] = ("None", "Theory", 0) # Added 0 for experience
+    subjects[cls]["FREE"] = ("None", "Theory", 0)
 
 # -------------------------------
 # VARIABLES
@@ -55,7 +51,6 @@ random.shuffle(variables)
 # -------------------------------
 def count_sub(assignment, cls, sub):
     count = sum(1 for (c, _, _), v in assignment.items() if c == cls and v[0] == sub)
-    # Since 1 Lab session = 2 slots, we divide by 2 to match the "required: 1" in JSON
     if "Lab" in sub:
         return count // 2
     return count
@@ -65,12 +60,10 @@ def count_sub(assignment, cls, sub):
 # -------------------------------
 def preassign_labs():
     assignment = {}
-    
     shuffled_classes = list(classes.keys())
     random.shuffle(shuffled_classes)
     
     for cls in shuffled_classes:
-        # Get all lab subjects for this class
         lab_subjects = [s for s in required[cls] if "Lab" in s]
         random.shuffle(lab_subjects)
 
@@ -80,24 +73,20 @@ def preassign_labs():
             random.shuffle(shuffled_days)
 
             for day in shuffled_days:
-                # RULE: Only 1 lab per day per class
                 if any(v[0] == cls and "Lab" in assignment[v][0] for v in assignment if v[1] == day):
                     continue
 
-                # RULE: Labs must start at 10:00 or 02:00 to take 2 continuous slots
                 starts = ["10:00-11:30", "02:00-03:30"]
                 random.shuffle(starts)
 
                 for start in starts:
                     nxt = next_slot(start)
-                    v1 = (cls, day, start)
-                    v2 = (cls, day, nxt)
+                    v1, v2 = (cls, day, start), (cls, day, nxt)
 
-                    # Ensure slots aren't already taken by another class's lab
                     if v1 in assignment or v2 in assignment:
                         continue
 
-                    fac, _, _ = subjects[cls][sub]
+                    fac, _, _ = subjects[cls][sub] # Corrected unpacking
                     room_list = list(rooms.items())
                     random.shuffle(room_list)
 
@@ -105,7 +94,6 @@ def preassign_labs():
                         if typ != "Lab":
                             continue
                         
-                        # Check if Faculty or Room is busy in EITHER of the two slots
                         clash = False
                         for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
                             if d2 == day and (s2 == start or s2 == nxt):
@@ -114,15 +102,14 @@ def preassign_labs():
                                     break
                         
                         if not clash:
-                            # Assign both slots simultaneously
                             assignment[v1] = (sub, fac, room)
                             assignment[v2] = (sub, fac, room)
                             placed = True
                             break
-
                     if placed: break
                 if placed: break
     return assignment
+
 # -------------------------------
 # CONSISTENCY
 # -------------------------------
@@ -131,50 +118,30 @@ def is_consistent(var, value, assignment):
     sub, fac, room = value
     typ = subjects[cls][sub][1]
 
-    # 1. Prevent Theory from overwriting pre-assigned Labs
-    if var in assignment:
-        return False
-
-    # 2. Subject Quantity Rule
+    if var in assignment: return False
     if sub in required[cls] and count_sub(assignment, cls, sub) >= required[cls][sub]:
         return False
 
-    # 3. Global Resource Clash (Faculty/Room)
     for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
         if d2 == day and s2 == slot:
-            if fac2 == fac and fac != "None":
-                return False
-            if room2 == room:
-                return False
+            if fac2 == fac and fac != "None": return False
+            if room2 == room: return False
 
-    # 4. Daily Variety: No same theory twice a day for a class
     if typ == "Theory" and sub != "FREE":
         for (c2, d2, s2), (sub2, fac2, room2) in assignment.items():
             if c2 == cls and d2 == day and sub2 == sub:
                 return False
 
-    # 5. Lab Rule: Ensure no second lab is added to the same day
     if "Lab" in sub:
         if any("Lab" in v[0] for (c, d, s), v in assignment.items() if c == cls and d == day):
             return False
 
-    # Updated FREE slot logic inside is_consistent:
     if sub == "FREE":
-    # Limit total FREE slots to 5, but allow them anywhere 
-    # OR keep them in the afternoon only if labs aren't there.
-        free_count = sum(1 for (c, d, s), v in assignment.items() 
-                         if c == cls and v[0] == "FREE")
-        if free_count >= 5:
-            return False
-
-    # 7. No Gap Rule: Discourage single isolated classes (Optional but helpful)
-    # If this is the only class in the morning or only in the afternoon, maybe reject it.
-    if sub != "FREE":
-        day_classes = [v[0] for (c, d, s), v in assignment.items() if c == cls and d == day]
-        if len(day_classes) >= 3: # If we already have 3 classes, don't worry about gaps
-            pass
+        free_count = sum(1 for (c, d, s), v in assignment.items() if c == cls and v[0] == "FREE")
+        if free_count >= 5: return False
 
     return True
+
 # -------------------------------
 # MRV
 # -------------------------------
@@ -183,35 +150,26 @@ def select_var(assignment):
     min_options = float('inf')
 
     for v in variables:
-        if v in assignment:
-            continue
-
+        if v in assignment: continue
         cls, day, slot = v
         options = 0
-
-        for sub, (fac, typ) in subjects[cls].items():
+        for sub, (fac, typ, exp) in subjects[cls].items(): # Corrected unpacking
             for room, rtype in rooms.items():
                 if typ == rtype:
                     if is_consistent(v, (sub, fac, room), assignment):
                         options += 1
-
-        if options == 0:
-            return v
-
+        if options == 0: return v
         if options < min_options:
             min_options = options
             best = v
-
     return best
 
 # -------------------------------
-# VALUE ORDER (SMART)
+# VALUE ORDER (SENIORITY LOGIC)
 # -------------------------------
-# --- REPLACE YOUR ENTIRE order_values FUNCTION WITH THIS ---
 def order_values(var, assignment):
     cls, day, slot = var
     vals = []
-    morning_slots = ["10:00-11:30", "11:30-01:00"]
     
     room_items = list(rooms.items())
     random.shuffle(room_items)
@@ -227,12 +185,9 @@ def order_values(var, assignment):
         sub_name, _, _, exp = val
         if sub_name == "FREE": return 1000 
         
-        # Priority Logic: Smaller score = Higher Priority
         is_morning = slot in morning_slots
-        # If morning, -15 (exp) is smaller than -2 (exp), so 15 years goes first
         seniority_priority = -exp if is_morning else exp 
         
-        # Clustering: Prioritize slots next to existing classes
         idx = time_slots.index(slot)
         has_neighbor = any(0 <= n_idx < len(time_slots) and (cls, day, time_slots[n_idx]) in assignment 
                            for n_idx in [idx - 1, idx + 1])
@@ -240,49 +195,18 @@ def order_values(var, assignment):
         return seniority_priority + (0 if has_neighbor else 100)
 
     vals.sort(key=combined_score)
-    # Strip experience before returning so the backtracking logic remains compatible
     return [(v[0], v[1], v[2]) for v in vals]
-
-    # --- CLUSTERING LOGIC ---
-    # This helper function scores a choice. Lower score = Higher priority.
-    def cluster_score(val):
-        sub_name, _, _ = val
-        if sub_name == "FREE": 
-            return 100 # Keep FREE as the absolute last resort
-        
-        # Check if the neighboring slots on the SAME DAY already have a class
-        idx = time_slots.index(slot)
-        has_neighbor = False
-        
-        # Check slot before (idx-1) and slot after (idx+1)
-        for neighbor_idx in [idx - 1, idx + 1]:
-            if 0 <= neighbor_idx < len(time_slots):
-                neighbor_slot = time_slots[neighbor_idx]
-                # If a class is already scheduled next to this slot, give it priority
-                if (cls, day, neighbor_slot) in assignment:
-                    has_neighbor = True
-        
-        return 0 if has_neighbor else 1 # Priority 0 (neighbor) comes before 1 (no neighbor)
-
-    # Sort the values based on the clustering score
-    random.shuffle(vals) # Maintain some randomness for different results
-    vals.sort(key=cluster_score)
-    
-    return vals 
 
 # -------------------------------
 # FORWARD CHECK
 # -------------------------------
 def forward_check(assignment):
     remaining_slots = len(variables) - len(assignment)
-
     needed = 0
     for cls in required:
         for sub in required[cls]:
-            if "Lab" in sub:
-                continue
+            if "Lab" in sub: continue
             needed += max(0, required[cls][sub] - count_sub(assignment, cls, sub))
-
     return remaining_slots >= needed
 
 # -------------------------------
@@ -296,39 +220,25 @@ def backtrack(assignment):
         return None
 
     var = select_var(assignment)
-
-    if var is None:
-        return None
+    if var is None: return None
 
     for val in order_values(var, assignment):
         if is_consistent(var, val, assignment):
             assignment[var] = val
-
             result = backtrack(assignment)
-            if result:
-                return result
-
+            if result: return result
             del assignment[var]
 
     return None
 
 # -------------------------------
-# RUN
+# RUN & HTML GENERATION
 # -------------------------------
-print("Solving multi-class timetable...")
+print("Solving multi-class timetable with Seniority Priority...")
 
 initial = preassign_labs()
 solution = backtrack(initial)
 
-# -------------------------------
-# PRINT
-# -------------------------------
-# -------------------------------
-# PRINT (TABLE FORMAT)
-# -------------------------------
-# -------------------------------
-# GENERATE HTML FILE
-# -------------------------------
 if solution:
     html_content = """
     <!DOCTYPE html>
@@ -364,7 +274,6 @@ if solution:
                 res = solution.get((cls, d, t))
                 if res:
                     sub, fac, room = res
-                    # Add specific CSS classes for styling
                     css_class = "lab" if "Lab" in sub else ("free" if sub == "FREE" else "")
                     html_content += f"<td class='{css_class}'>{sub}<br><small>{fac} ({room})</small></td>"
                 else:
