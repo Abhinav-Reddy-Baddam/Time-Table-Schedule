@@ -29,18 +29,17 @@ def next_slot(slot):
 # -------------------------------
 # BUILD STRUCTURES
 # -------------------------------
-subjects = {}
-required = {}
-
+# --- UPDATE THIS BLOCK ---
 for cls, subs in classes.items():
     subjects[cls] = {}
     required[cls] = {}
 
     for sub, details in subs.items():
-        subjects[cls][sub] = (details["faculty"], details["type"])
+        # Added details.get("experience", 0) to the tuple
+        subjects[cls][sub] = (details["faculty"], details["type"], details.get("experience", 0))
         required[cls][sub] = details["required"]
 
-    subjects[cls]["FREE"] = ("None", "Theory")
+    subjects[cls]["FREE"] = ("None", "Theory", 0) # Added 0 for experience
 
 # -------------------------------
 # VARIABLES
@@ -95,7 +94,7 @@ def preassign_labs():
                     if v1 in assignment or v2 in assignment:
                         continue
 
-                    fac = subjects[cls][sub][0]
+                    fac, _, _ = subjects[cls][sub]
                     room_list = list(rooms.items())
                     random.shuffle(room_list)
 
@@ -205,20 +204,41 @@ def select_var(assignment):
 # -------------------------------
 # VALUE ORDER (SMART)
 # -------------------------------
+# --- REPLACE YOUR ENTIRE order_values FUNCTION WITH THIS ---
 def order_values(var, assignment):
-    cls, day, slot = var  # Unpack the day and slot from the variable
+    cls, day, slot = var
     vals = []
+    morning_slots = ["10:00-11:30", "11:30-01:00"]
     
     room_items = list(rooms.items())
     random.shuffle(room_items)
 
-    for sub, (fac, typ) in subjects[cls].items():
+    for sub, (fac, typ, exp) in subjects[cls].items():
         if sub in required[cls] and count_sub(assignment, cls, sub) >= required[cls][sub]:
             continue
-
         for room, rtype in room_items:
             if typ == rtype:
-                vals.append((sub, fac, room))
+                vals.append((sub, fac, room, exp))
+
+    def combined_score(val):
+        sub_name, _, _, exp = val
+        if sub_name == "FREE": return 1000 
+        
+        # Priority Logic: Smaller score = Higher Priority
+        is_morning = slot in morning_slots
+        # If morning, -15 (exp) is smaller than -2 (exp), so 15 years goes first
+        seniority_priority = -exp if is_morning else exp 
+        
+        # Clustering: Prioritize slots next to existing classes
+        idx = time_slots.index(slot)
+        has_neighbor = any(0 <= n_idx < len(time_slots) and (cls, day, time_slots[n_idx]) in assignment 
+                           for n_idx in [idx - 1, idx + 1])
+        
+        return seniority_priority + (0 if has_neighbor else 100)
+
+    vals.sort(key=combined_score)
+    # Strip experience before returning so the backtracking logic remains compatible
+    return [(v[0], v[1], v[2]) for v in vals]
 
     # --- CLUSTERING LOGIC ---
     # This helper function scores a choice. Lower score = Higher priority.
