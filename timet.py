@@ -165,6 +165,13 @@ def is_consistent(var, value, assignment):
         if free_count >= 5:
             return False
 
+    # 7. No Gap Rule: Discourage single isolated classes (Optional but helpful)
+    # If this is the only class in the morning or only in the afternoon, maybe reject it.
+    if sub != "FREE":
+        day_classes = [v[0] for (c, d, s), v in assignment.items() if c == cls and d == day]
+        if len(day_classes) >= 3: # If we already have 3 classes, don't worry about gaps
+            pass
+
     return True
 # -------------------------------
 # MRV
@@ -199,10 +206,9 @@ def select_var(assignment):
 # VALUE ORDER (SMART)
 # -------------------------------
 def order_values(var, assignment):
-    cls, _, _ = var
+    cls, day, slot = var  # Unpack the day and slot from the variable
     vals = []
     
-    # Shuffle rooms and subjects to ensure variety in theory slots
     room_items = list(rooms.items())
     random.shuffle(room_items)
 
@@ -214,9 +220,31 @@ def order_values(var, assignment):
             if typ == rtype:
                 vals.append((sub, fac, room))
 
-    # Always keep FREE as the last resort, but shuffle the rest
-    random.shuffle(vals)
-    vals.sort(key=lambda v: 1 if v[0] == "FREE" else 0)
+    # --- CLUSTERING LOGIC ---
+    # This helper function scores a choice. Lower score = Higher priority.
+    def cluster_score(val):
+        sub_name, _, _ = val
+        if sub_name == "FREE": 
+            return 100 # Keep FREE as the absolute last resort
+        
+        # Check if the neighboring slots on the SAME DAY already have a class
+        idx = time_slots.index(slot)
+        has_neighbor = False
+        
+        # Check slot before (idx-1) and slot after (idx+1)
+        for neighbor_idx in [idx - 1, idx + 1]:
+            if 0 <= neighbor_idx < len(time_slots):
+                neighbor_slot = time_slots[neighbor_idx]
+                # If a class is already scheduled next to this slot, give it priority
+                if (cls, day, neighbor_slot) in assignment:
+                    has_neighbor = True
+        
+        return 0 if has_neighbor else 1 # Priority 0 (neighbor) comes before 1 (no neighbor)
+
+    # Sort the values based on the clustering score
+    random.shuffle(vals) # Maintain some randomness for different results
+    vals.sort(key=cluster_score)
+    
     return vals
 
 # -------------------------------
