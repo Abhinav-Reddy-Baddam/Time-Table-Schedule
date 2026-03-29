@@ -2,7 +2,7 @@ import json
 import random
 
 # LOAD DATA
-with open("mourya.json", "r") as f:
+with open("data.json", "r") as f:
     data = json.load(f)
 
 classes, rooms = data["classes"], data["rooms"]
