@@ -21,6 +21,7 @@ time_slots = [
     "03:30-05:00"
 ]
 morning_slots = ["10:00-11:30", "11:30-01:00"]
+SENIOR_THRESHOLD = 10  # Experience years to be considered "Senior"
 
 def next_slot(slot):
     i = time_slots.index(slot)
@@ -56,7 +57,7 @@ def count_sub(assignment, cls, sub):
     return count
 
 # -------------------------------
-# PREASSIGN LABS
+# PREASSIGN LABS (Strict Senior Morning Rule)
 # -------------------------------
 def preassign_labs():
     assignment = {}
@@ -76,8 +77,13 @@ def preassign_labs():
                 if any(v[0] == cls and "Lab" in assignment[v][0] for v in assignment if v[1] == day):
                     continue
 
-                starts = ["10:00-11:30", "02:00-03:30"]
-                random.shuffle(starts)
+                fac, _, exp = subjects[cls][sub]
+                
+                # STRICT RULE: Senior Labs ONLY in morning, Junior Labs ONLY in afternoon
+                if exp >= SENIOR_THRESHOLD:
+                    starts = ["10:00-11:30"]
+                else:
+                    starts = ["02:00-03:30"]
 
                 for start in starts:
                     nxt = next_slot(start)
@@ -86,7 +92,6 @@ def preassign_labs():
                     if v1 in assignment or v2 in assignment:
                         continue
 
-                    fac, _, _ = subjects[cls][sub] # Corrected unpacking
                     room_list = list(rooms.items())
                     random.shuffle(room_list)
 
@@ -111,14 +116,21 @@ def preassign_labs():
     return assignment
 
 # -------------------------------
-# CONSISTENCY
+# CONSISTENCY (Strict Senior morning Rule)
 # -------------------------------
 def is_consistent(var, value, assignment):
     cls, day, slot = var
     sub, fac, room = value
     typ = subjects[cls][sub][1]
+    exp = subjects[cls][sub][2]
 
     if var in assignment: return False
+    
+    # --- STRICT SENIORITY CONSTRAINT ---
+    if exp >= SENIOR_THRESHOLD and sub != "FREE":
+        if slot not in morning_slots:
+            return False # Stop senior faculty from being in the afternoon
+
     if sub in required[cls] and count_sub(assignment, cls, sub) >= required[cls][sub]:
         return False
 
@@ -153,7 +165,7 @@ def select_var(assignment):
         if v in assignment: continue
         cls, day, slot = v
         options = 0
-        for sub, (fac, typ, exp) in subjects[cls].items(): # Corrected unpacking
+        for sub, (fac, typ, exp) in subjects[cls].items():
             for room, rtype in rooms.items():
                 if typ == rtype:
                     if is_consistent(v, (sub, fac, room), assignment):
@@ -165,12 +177,11 @@ def select_var(assignment):
     return best
 
 # -------------------------------
-# VALUE ORDER (SENIORITY LOGIC)
+# VALUE ORDER
 # -------------------------------
 def order_values(var, assignment):
     cls, day, slot = var
     vals = []
-    
     room_items = list(rooms.items())
     random.shuffle(room_items)
 
@@ -184,57 +195,43 @@ def order_values(var, assignment):
     def combined_score(val):
         sub_name, _, _, exp = val
         if sub_name == "FREE": return 1000 
-        
         is_morning = slot in morning_slots
         seniority_priority = -exp if is_morning else exp 
         
         idx = time_slots.index(slot)
         has_neighbor = any(0 <= n_idx < len(time_slots) and (cls, day, time_slots[n_idx]) in assignment 
                            for n_idx in [idx - 1, idx + 1])
-        
         return seniority_priority + (0 if has_neighbor else 100)
 
     vals.sort(key=combined_score)
     return [(v[0], v[1], v[2]) for v in vals]
 
 # -------------------------------
-# FORWARD CHECK
+# FORWARD CHECK & BACKTRACK
 # -------------------------------
 def forward_check(assignment):
     remaining_slots = len(variables) - len(assignment)
-    needed = 0
-    for cls in required:
-        for sub in required[cls]:
-            if "Lab" in sub: continue
-            needed += max(0, required[cls][sub] - count_sub(assignment, cls, sub))
+    needed = sum(max(0, required[cls][sub] - count_sub(assignment, cls, sub))
+                 for cls in required for sub in required[cls] if "Lab" not in sub)
     return remaining_slots >= needed
 
-# -------------------------------
-# BACKTRACK
-# -------------------------------
 def backtrack(assignment):
-    if len(assignment) == len(variables):
-        return assignment
-
-    if not forward_check(assignment):
-        return None
-
+    if len(assignment) == len(variables): return assignment
+    if not forward_check(assignment): return None
     var = select_var(assignment)
     if var is None: return None
-
     for val in order_values(var, assignment):
         if is_consistent(var, val, assignment):
             assignment[var] = val
             result = backtrack(assignment)
             if result: return result
             del assignment[var]
-
     return None
 
 # -------------------------------
-# RUN & HTML GENERATION
+# RUN & HTML
 # -------------------------------
-print("Solving multi-class timetable with Seniority Priority...")
+print("Solving with STRICT Senior Morning Rule...")
 
 initial = preassign_labs()
 solution = backtrack(initial)
@@ -280,9 +277,8 @@ if solution:
                     html_content += "<td>-</td>"
             html_content += "</tr>"
         html_content += "</table></div>"
-
     html_content += "</body></html>"
 
     with open("index.html", "w") as f:
         f.write(html_content)
-    print("✅ Success! index.html has been generated.")
+    print("✅ Success! index.html generated with Seniority Hard Constraints.")
