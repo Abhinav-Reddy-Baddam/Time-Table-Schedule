@@ -32,7 +32,7 @@
     },
     "CSE-D": {
       "Math": {"faculty": "F1", "type": "Theory", "required": 2, "experience": 15},
-      "AI": {"faculty": "F7", "type": "Theory", "required": 2, "experience": 4},
+      "AI": {"faculty": "F7", "type": "Theory", "required": 2, "experience": 4},  
       "OS": {"faculty": "F8", "type": "Theory", "required": 2, "experience": 3},
       "DBMS": {"faculty": "F9", "type": "Theory", "required": 2, "experience": 2},
       "CN": {"faculty": "F5", "type": "Theory", "required": 2, "experience": 7},

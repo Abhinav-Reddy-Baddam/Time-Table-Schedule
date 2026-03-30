@@ -3,9 +3,7 @@ import random
 import statistics
 import datetime
 
-# -------------------------------
-# LOAD DATA
-# -------------------------------
+
 try:
     with open("data.json", "r") as f:
         data = json.load(f)
@@ -16,9 +14,7 @@ except FileNotFoundError:
 classes = data["classes"]
 rooms = data["rooms"]
 
-# -------------------------------
-# SETUP
-# -------------------------------
+
 days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
 time_slots = ["10:00-11:30", "11:30-01:00", "02:00-03:30", "03:30-05:00"]
 priority_slots = ["10:00-11:30", "11:30-01:00", "02:00-03:30"]
@@ -30,9 +26,7 @@ def next_slot(slot):
     i = time_slots.index(slot)
     return time_slots[i + 1] if i < len(time_slots) - 1 else None
 
-# -------------------------------
-# BUILD STRUCTURES
-# -------------------------------
+
 subjects = {}
 required = {}
 for cls, subs in classes.items():
@@ -40,9 +34,7 @@ for cls, subs in classes.items():
     subjects[cls]["FREE"] = ("None", "Theory", 0)
     required[cls] = {s: d["required"] for s, d in subs.items()}
 
-# -------------------------------
-# LOGIC
-# -------------------------------
+
 def count_sub(assignment, cls, sub):
     count = sum(1 for (c, _, _), v in assignment.items() if c == cls and v[0] == sub)
     return count // 2 if "Lab" in sub else count
@@ -134,9 +126,7 @@ def backtrack(assignment, variables):
             del assignment[var]
     return None
 
-# -------------------------------
-# RUN
-# -------------------------------
+
 print("🚀 Optimizing Senior Faculty Placement...")
 vars_list = [(cls, d, t) for cls in classes for d in days for t in time_slots]
 vars_list.sort(key=lambda x: priority_slots.index(x[2]) if x[2] in priority_slots else 99)
@@ -199,15 +189,13 @@ if solution:
                 return; 
             }
 
-            // 1. Get Faculty name (for exact matching)
+            
             let facAttr = td.getAttribute('data-f').toUpperCase();
             
-            // 2. Get Subject and Room (from the visible text)
+           
             let cellText = td.innerText.toUpperCase();
 
-            // MATCHING LOGIC:
-            // - Exact match for Faculty (so F1 doesn't match F10)
-            // - OR Subject/Room contains the search text
+            
             if (facAttr === q || (cellText.includes(q) && facAttr !== "NONE")) {
                 td.classList.add('highlight'); 
                 td.classList.remove('fade');
